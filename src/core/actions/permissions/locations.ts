@@ -1,52 +1,42 @@
 import * as Location from 'expo-location';
 
 import { PermissionStatus } from '@/infrastructure';
-import { Alert, Linking } from 'react-native';
 
-export const requestLocationPermission = async (): Promise<PermissionStatus> => {
-  const { status } = await Location.requestForegroundPermissionsAsync();
+const mapToPermissionStatus = (
+  response: Location.LocationPermissionResponse,
+): PermissionStatus => {
+  switch (response.status) {
+    case Location.PermissionStatus.GRANTED: {
+      const accuracy = response.ios?.accuracy ?? response.android?.accuracy;
 
-  if (status !== 'granted') {
-    if (status === 'denied') {
-      manualPermissionRequest();
+      return accuracy === 'reduced' || accuracy === 'coarse'
+        ? PermissionStatus.LIMITED
+        : PermissionStatus.GRANTED;
     }
-    return PermissionStatus.DENIED;
-  }
 
-  return PermissionStatus.GRANTED;
-};
+    case Location.PermissionStatus.UNDETERMINED:
+      return PermissionStatus.UNDERTERMINED;
 
-export const checkLocationPermission = async () => {
-  const { status } = await Location.getForegroundPermissionsAsync();
-
-  switch (status) {
-    case 'granted':
-      return PermissionStatus.GRANTED;
-
-    case 'denied':
-      return PermissionStatus.DENIED;
+    case Location.PermissionStatus.DENIED:
+      return response.canAskAgain ? PermissionStatus.DENIED : PermissionStatus.BLOCKED;
 
     default:
-      return PermissionStatus.UNDERTERMINED;
+      return PermissionStatus.UNAVAILABLE;
   }
 };
 
-export const manualPermissionRequest = async () => {
-  Alert.alert(
-    'Permiso de ubicacion necesario',
-    'Para continuar debes de habilitar el permiso de locations o ubicacion, en los ajustes de la app',
-    [
-      {
-        text: `Abrir Ajustes`,
-        style: 'default',
-        onPress: () => {
-          Linking.openSettings();
-        },
-      },
-      {
-        text: 'Cancel',
-        style: 'destructive',
-      },
-    ],
-  );
+const readPermission = async (
+  getResponse: () => Promise<Location.LocationPermissionResponse>,
+): Promise<PermissionStatus> => {
+  try {
+    return mapToPermissionStatus(await getResponse());
+  } catch {
+    return PermissionStatus.UNAVAILABLE;
+  }
 };
+
+export const requestLocationPermission = (): Promise<PermissionStatus> =>
+  readPermission(() => Location.requestForegroundPermissionsAsync());
+
+export const checkLocationPermission = (): Promise<PermissionStatus> =>
+  readPermission(() => Location.getForegroundPermissionsAsync());
