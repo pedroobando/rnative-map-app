@@ -30,7 +30,7 @@ const PermissionCheckProvider = ({ children }: PropsWithChildren) => {
     return () => {
       suscription.remove();
     };
-  }, []);
+  }, [checkLocationPermission]);
 
   return <>{children}</>;
 };
