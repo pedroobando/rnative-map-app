@@ -8,6 +8,17 @@ Expo ships breaking changes every SDK release. APIs you remember are likely rena
 2. Fetch the matching versioned docs: `https://docs.expo.dev/versions/v<major>.0.0/`
 3. For anything else, fetch https://docs.expo.dev/llms.txt — an index of all Expo docs with corrections to common LLM misconceptions. Follow its links to the specific page you need; never answer from memory.
 
+## MCP: Context7 documentation
+
+The project has a Context7 MCP server configured in `.pi/mcp.json` (server name `context7`, endpoint `https://mcp.context7.com/mcp`). Use it to fetch up-to-date library documentation instead of relying on training data:
+
+```
+mcp({ tool: "mcp_resolve-library-id", args: { query: "expo-router" } })
+mcp({ tool: "mcp_query-docs", args: { libraryId: "<resolved-id>", query: "..." } })
+```
+
+Applies to any library/framework (React, Expo, React Native, etc.). The server is project-scoped, so approve it when Pi prompts.
+
 ## Commands
 
 Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).
