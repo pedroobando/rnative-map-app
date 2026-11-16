@@ -1,56 +1,64 @@
-# Welcome to your Expo app 👋
+# Maps App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplicación de [Expo](https://expo.dev) / React Native organizada con Expo Router. Esta primera etapa prepara **el flujo de permisos de ubicación** que utilizará el mapa. La pantalla del mapa todavía es un marcador de lugar; lo importante en este punto es la infraestructura de permisos.
 
-## Get started
+## Pantalla de permisos
 
-1. Install dependencies
+<p align="center">
+  <img src=".pi/docs/part-01.jpeg" alt="Pantalla de permisos de ubicación con el estado DENIED" width="240" />
+</p>
 
-   ```bash
-   npm install
-   ```
+En `src/app/permissions/index.tsx` se muestra el estado actual del permiso y el botón **Habilitar ubicación**. Al pulsarlo se solicita el acceso. Si la respuesta no es `GRANTED`, se muestra una alerta explicando al usuario qué hacer; cuando el permiso está bloqueado o denegado, la alerta ofrece abrir los ajustes de la aplicación.
 
-2. Start the app
+## Cómo funciona el flujo
 
-   ```bash
-   npx expo start
-   ```
+1. `PermissionCheckProvider`, montado en `src/app/_layout.tsx`, consulta el permiso al iniciar la app.
+2. `usePermissionsStore` mantiene el estado en `CHECKING` mientras se realiza la consulta.
+3. Las acciones de `src/core/actions/permissions/locations.ts` llaman a `expo-location` y convierten su respuesta en un valor de `PermissionStatus`, independiente de la librería nativa.
+4. Si el permiso es `GRANTED`, el provider navega a `/map`. En cualquier otro estado se muestra `/permissions`.
+5. Cuando la app vuelve a estar en primer plano, el provider vuelve a verificar el permiso. Así se detecta que el usuario lo cambió desde los ajustes del sistema.
 
-In the output, you'll find options to open the app in a
+## Un flujo de permisos reutilizable
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Aunque el primer caso de uso es el mapa, este diseño no está limitado a la ubicación:
 
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+- `PermissionStatus` define estados comunes (`GRANTED`, `DENIED`, `BLOCKED`, `LIMITED`, etc.) desacoplados de `expo-location`.
+- Las acciones del núcleo actúan como adaptadores: traducen la respuesta de cada API nativa a esos estados comunes.
+- `usePermissionsStore` centraliza el estado y las acciones asíncronas. Hoy expone ubicación porque es el servicio implementado, pero puede extenderse para cámara, notificaciones, Bluetooth u otros servicios.
+- El provider se encarga de la navegación y la pantalla solo consume el hook, sin llamar directamente a la API nativa.
+- La capa de presentación decide cómo informar al usuario para cada estado.
 
-## Get a fresh project
+De esta forma, al incorporar un nuevo servicio basta con crear su adaptador y sus estados de permiso, y reutilizar la misma estructura de hook, provider y pantalla.
 
-When you're ready, run:
+## Estructura principal
 
-```bash
-npm run reset-project
+```text
+src/
+├── app/
+│   ├── _layout.tsx                     # Provider de permisos y navegación
+│   └── permissions/index.tsx           # Pantalla para solicitar el permiso
+├── core/actions/permissions/
+│   └── locations.ts                    # Consulta y normaliza el permiso de ubicación
+├── infrastructure/interface/
+│   └── location.ts                     # Enum PermissionStatus
+└── presentation/
+    ├── hooks/useLocationPermissionAlert.ts
+    ├── providers/PermissionCheckProvider.tsx
+    └── store/usePermissions.ts         # Hook/store de estado de permisos
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+## Ejecutar el proyecto
 
-### Other setup steps
+El repositorio usa Bun:
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```bash
+bun install
+bunx expo start
+```
 
-## Learn more
+Verificaciones antes de entregar cambios:
 
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+bunx expo lint
+bunx tsc --noEmit
+```
