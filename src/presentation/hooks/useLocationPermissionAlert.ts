@@ -31,7 +31,7 @@ const CONTENT: Partial<Record<PermissionStatus, AlertContent>> = {
 
 export const useLocationPermissionAlert = () =>
   useCallback((status: PermissionStatus) => {
-    if (status === PermissionStatus.GRANTED || status === PermissionStatus.UNDERTERMINED) {
+    if (status === PermissionStatus.GRANTED || status === PermissionStatus.UNDETERMINED) {
       return;
     }
 

@@ -5,11 +5,14 @@ import { AppState } from 'react-native';
 import { usePermissionsStore } from '../store/usePermissionsStore';
 
 const PermissionCheckProvider = ({ children }: PropsWithChildren) => {
-  const { locationsStatus, checkLocationPermission } = usePermissionsStore();
+  const locationsStatus = usePermissionsStore((state) => state.locationsStatus);
+  const checkLocationPermissionStatus = usePermissionsStore(
+    (state) => state.checkLocationPermissionStatus,
+  );
 
   useEffect(() => {
-    checkLocationPermission();
-  }, [checkLocationPermission]);
+    checkLocationPermissionStatus();
+  }, [checkLocationPermissionStatus]);
 
   useEffect(() => {
     if (locationsStatus === PermissionStatus.GRANTED) {
@@ -23,14 +26,14 @@ const PermissionCheckProvider = ({ children }: PropsWithChildren) => {
     const suscription = AppState.addEventListener('change', (nextAppState) => {
       // console.log({ nextAppState });
       if (nextAppState === 'active') {
-        checkLocationPermission();
+        checkLocationPermissionStatus();
       }
     });
 
     return () => {
       suscription.remove();
     };
-  }, [checkLocationPermission]);
+  }, [checkLocationPermissionStatus]);
 
   return <>{children}</>;
 };
