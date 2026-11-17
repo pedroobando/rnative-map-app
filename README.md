@@ -2,6 +2,10 @@
 
 Aplicación de [Expo](https://expo.dev) / React Native organizada con Expo Router. Esta primera etapa prepara **el flujo de permisos de ubicación** que utilizará el mapa. La pantalla del mapa todavía es un marcador de lugar; lo importante en este punto es la infraestructura de permisos.
 
+Como parte de esta guía, también estamos revisando la [documentación oficial de MapView de Expo](https://docs.expo.dev/versions/latest/sdk/map-view/) para preparar la siguiente etapa: mostrar la ubicación del usuario en un mapa interactivo.
+
+Como referencia complementaria, el repositorio de [react-native-maps en GitHub](https://github.com/react-native-maps/react-native-maps) reúne ejemplos y componentes —como marcadores, polilíneas, círculos o ventanas de información— que podremos incorporar al mapa.
+
 ## Pantalla de permisos
 
 <p align="center">

@@ -1,1 +1,2 @@
-export { usePermissionsStore } from './usePermissions';
+export { useLocationStore } from './useLocationStore';
+export { usePermissionsStore } from './usePermissionsStore';
