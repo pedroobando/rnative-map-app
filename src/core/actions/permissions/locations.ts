@@ -15,7 +15,7 @@ const mapToPermissionStatus = (
     }
 
     case Location.PermissionStatus.UNDETERMINED:
-      return PermissionStatus.UNDERTERMINED;
+      return PermissionStatus.UNDETERMINED;
 
     case Location.PermissionStatus.DENIED:
       return response.canAskAgain ? PermissionStatus.DENIED : PermissionStatus.BLOCKED;

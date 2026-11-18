@@ -14,8 +14,12 @@ export const CustomMap = ({ initialLocation, showUserLocation = false, ...rest }
   const mapRef = useRef<MapView>(null);
   const [isFollowingUser, setIsFollowingUser] = useState(true);
   const [isRouterUser, setIsRouterUser] = useState(false);
-  const { watchLocation, clearWatchLocation, lastKnownLocation, getLocation, userLocationList } =
-    useLocationStore();
+
+  // Selectores individuales: sin ellos, cada actualización del GPS
+  // re-renderizaría el MapView aunque no se usara ese campo del store.
+  const lastKnownLocation = useLocationStore((state) => state.lastKnownLocation);
+  const userLocationList = useLocationStore((state) => state.userLocationList);
+  const getLocation = useLocationStore((state) => state.getLocation);
 
   const moveCamaraToLocation = (latlng: ILatLng) => {
     if (!mapRef.current) return;
@@ -26,24 +30,17 @@ export const CustomMap = ({ initialLocation, showUserLocation = false, ...rest }
   };
 
   const moveToCurrentLocation = async () => {
-    if (!lastKnownLocation) {
-      moveCamaraToLocation(initialLocation);
-    } else {
-      moveCamaraToLocation(lastKnownLocation);
+    moveCamaraToLocation(lastKnownLocation ?? initialLocation);
+
+    try {
+      const location = await getLocation();
+      moveCamaraToLocation(location);
+    } catch (error) {
+      // Si el mapa ya está visible, MapScreen no muestra errores: se registra
+      // aquí para no dejar la failure silenciosa.
+      console.warn('No se pudo obtener la ubicación actual', error);
     }
-
-    const location = await getLocation();
-    if (!location) return;
-    moveCamaraToLocation(location);
   };
-
-  useEffect(() => {
-    watchLocation();
-    return () => {
-      clearWatchLocation();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     if (lastKnownLocation && isFollowingUser) {
@@ -86,7 +83,7 @@ export const CustomMap = ({ initialLocation, showUserLocation = false, ...rest }
       />
 
       <FAB
-        onPress={() => moveToCurrentLocation}
+        onPress={() => void moveToCurrentLocation()}
         style={{ bottom: 60, right: 20 }}
         iconName="compass-outline"
       />

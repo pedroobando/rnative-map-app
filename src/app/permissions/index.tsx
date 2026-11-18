@@ -4,11 +4,12 @@ import { useLocationPermissionAlert } from '@/presentation/hooks/useLocationPerm
 import { usePermissionsStore } from '@/presentation/store';
 
 const PermissionsScreen = () => {
-  const { locationsStatus, requestLocationPermission } = usePermissionsStore();
+  const locationsStatus = usePermissionsStore((state) => state.locationsStatus);
+  const setLocationPermission = usePermissionsStore((state) => state.setLocationPermission);
   const showLocationPermissionAlert = useLocationPermissionAlert();
 
   const handleRequest = async () => {
-    const status = await requestLocationPermission();
+    const status = await setLocationPermission();
 
     if (status !== PermissionStatus.GRANTED) {
       showLocationPermissionAlert(status);

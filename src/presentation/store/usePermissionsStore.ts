@@ -9,20 +9,22 @@ import { PermissionStatus } from '@/infrastructure';
 interface IPermissionsState {
   locationsStatus: PermissionStatus;
 
-  requestLocationPermission: () => Promise<PermissionStatus>;
-  checkLocationPermission: () => Promise<PermissionStatus>;
+  // Se prefijan con `set`/`check` para diferenciarlas de las acciones de
+  // core/actions/permissions, que tienen el mismo nombre.
+  setLocationPermission: () => Promise<PermissionStatus>;
+  checkLocationPermissionStatus: () => Promise<PermissionStatus>;
 }
 
 export const usePermissionsStore = create<IPermissionsState>()((set) => ({
   locationsStatus: PermissionStatus.CHECKING,
 
-  requestLocationPermission: async () => {
+  setLocationPermission: async () => {
     const status = await requestLocationPermission();
     set({ locationsStatus: status });
     return status;
   },
 
-  checkLocationPermission: async () => {
+  checkLocationPermissionStatus: async () => {
     const status = await checkLocationPermission();
     set({ locationsStatus: status });
     return status;
