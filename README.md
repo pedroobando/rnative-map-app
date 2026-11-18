@@ -1,54 +1,104 @@
 # Maps App
 
-Aplicación de [Expo](https://expo.dev) / React Native organizada con Expo Router. Esta primera etapa prepara **el flujo de permisos de ubicación** que utilizará el mapa. La pantalla del mapa todavía es un marcador de lugar; lo importante en este punto es la infraestructura de permisos.
+Aplicación de [Expo](https://expo.dev) / React Native organizada con Expo Router (SDK 58). La app consulta el **permiso de ubicación en primer plano**, muestra la pantalla de permisos cuando hace falta y, una vez concedido, obtiene la posición del dispositivo y la centra en un mapa interactivo.
 
-Como parte de esta guía, también estamos revisando la [documentación oficial de MapView de Expo](https://docs.expo.dev/versions/latest/sdk/map-view/) para preparar la siguiente etapa: mostrar la ubicación del usuario en un mapa interactivo.
+Mientras la app está activa, un proveedor global escucha los cambios de ubicación, conserva un historial limitado de coordenadas y permite dibujarlo como una **polilínea** sobre el mapa. El mapa también puede seguir al usuario, dejar de seguirlo al tocar la pantalla y volver a centrarse en la posición actual.
 
-Como referencia complementaria, el repositorio de [react-native-maps en GitHub](https://github.com/react-native-maps/react-native-maps) reúne ejemplos y componentes —como marcadores, polilíneas, círculos o ventanas de información— que podremos incorporar al mapa.
+Se usa la [documentación oficial de MapView de Expo](https://docs.expo.dev/versions/latest/sdk/map-view/) y los ejemplos de [react-native-maps en GitHub](https://github.com/react-native-maps/react-native-maps) como referencia para marcadores, polilíneas, círculos y ventanas de información.
 
-## Pantalla de permisos
+## Pantallas
 
-<p align="center">
-  <img src=".pi/docs/part-01.jpeg" alt="Pantalla de permisos de ubicación con el estado DENIED" width="240" />
-</p>
+| Permisos | Mapa con seguimiento |
+|:---:|:---:|
+| <img src=".pi/docs/part-01.jpeg" alt="Pantalla de permisos de ubicación con el estado DENIED" width="240" /> | <img src=".pi/docs/part-02.jpeg" alt="Mapa con la ubicación del usuario y controles flotantes" width="240" /> |
 
-En `src/app/permissions/index.tsx` se muestra el estado actual del permiso y el botón **Habilitar ubicación**. Al pulsarlo se solicita el acceso. Si la respuesta no es `GRANTED`, se muestra una alerta explicando al usuario qué hacer; cuando el permiso está bloqueado o denegado, la alerta ofrece abrir los ajustes de la aplicación.
+La primera imagen muestra `src/app/permissions/index.tsx` con el estado del permiso y el botón **Habilitar ubicación**. La segunda corresponde a `src/app/map/index.tsx`: el mapa centrado en la ubicación actual, el punto azul del usuario y los botones para alternar la ruta, seguir al usuario y recentrar la cámara.
 
-## Cómo funciona el flujo
+## Qué hace la aplicación
 
 1. `PermissionCheckProvider`, montado en `src/app/_layout.tsx`, consulta el permiso al iniciar la app.
-2. `usePermissionsStore` mantiene el estado en `CHECKING` mientras se realiza la consulta.
-3. Las acciones de `src/core/actions/permissions/locations.ts` llaman a `expo-location` y convierten su respuesta en un valor de `PermissionStatus`, independiente de la librería nativa.
-4. Si el permiso es `GRANTED`, el provider navega a `/map`. En cualquier otro estado se muestra `/permissions`.
-5. Cuando la app vuelve a estar en primer plano, el provider vuelve a verificar el permiso. Así se detecta que el usuario lo cambió desde los ajustes del sistema.
+2. Las acciones de `src/core/actions/permissions/locations.ts` traducen la respuesta de `expo-location` a un `PermissionStatus` desacoplado de la librería nativa.
+3. Si el permiso es `GRANTED`, el provider navega a `/map`. En cualquier otro estado, muestra `/permissions` (después de `CHECKING`).
+4. `LocationWatchProvider` inicia el seguimiento solo cuando el permiso está concedido y lo detiene cuando cambia o se desmonta.
+5. `MapScreen` pide la primera ubicación; mientras llega muestra un `ActivityIndicator` y, si falla, muestra el error junto a un botón **Reintentar**.
+6. `CustomMap` renderiza el `MapView` con `PROVIDER_GOOGLE`, `showsUserLocation`, controles flotantes y la `Polyline` opcional.
+7. Al volver la app a primer plano, `AppState` vuelve a verificar el permiso para detectar cambios hechos desde los ajustes del sistema.
 
-## Un flujo de permisos reutilizable
+## Permisos
 
-Aunque el primer caso de uso es el mapa, este diseño no está limitado a la ubicación:
+`PermissionStatus` (`src/infrastructure/interface/location.ts`) define los estados `CHECKING`, `GRANTED`, `DENIED`, `BLOCKED`, `LIMITED`, `UNAVAILABLE` y `UNDETERMINED`. Las acciones del núcleo son adaptadores: convierten `getForegroundPermissionsAsync` y `requestForegroundPermissionsAsync` en esos estados comunes. Una precisión reducida o aproximada se reporta como `LIMITED`; un permiso denegado que ya no se puede volver a pedir se reporta como `BLOCKED`.
 
-- `PermissionStatus` define estados comunes (`GRANTED`, `DENIED`, `BLOCKED`, `LIMITED`, etc.) desacoplados de `expo-location`.
-- Las acciones del núcleo actúan como adaptadores: traducen la respuesta de cada API nativa a esos estados comunes.
-- `usePermissionsStore` centraliza el estado y las acciones asíncronas. Hoy expone ubicación porque es el servicio implementado, pero puede extenderse para cámara, notificaciones, Bluetooth u otros servicios.
-- El provider se encarga de la navegación y la pantalla solo consume el hook, sin llamar directamente a la API nativa.
-- La capa de presentación decide cómo informar al usuario para cada estado.
+La pantalla de permisos solo consume `usePermissionsStore` y delega los mensajes en el hook `useLocationPermissionAlert`. Este hook muestra una alerta distinta para cada estado y ofrece **Abrir ajustes** mediante `Linking.openSettings()` cuando el permiso fue denegado o bloqueado; en web usa `window.alert`.
 
-De esta forma, al incorporar un nuevo servicio basta con crear su adaptador y sus estados de permiso, y reutilizar la misma estructura de hook, provider y pantalla.
+## Mapa, seguimiento y polilíneas
+
+- `CustomMap` recibe `initialLocation` desde `MapScreen` y configura la región inicial con `latitudeDelta: 0.0922` y `longitudeDelta: 0.0421`.
+- Mantiene la cámara centrada en `lastKnownLocation` mientras `isFollowingUser` es `true`. El evento `onTouchStart` pone ese estado en `false` para no pelearse con el gesto del usuario.
+- El botón de brújula llama a `getLocation()` y anima la cámara hacia la posición recién obtenida.
+- `isRouterUser` controla si se dibuja la `Polyline` con `coordinates={userLocationList}`, `strokeColor="black"` y `strokeWidth={5}`.
+- El guardián usa `Location.Accuracy.Balanced` y `distanceInterval: 40`. Para evitar copias infinitas y reenvíos costosos al componente nativo, `useLocationStore` conserva como máximo `MAX_POINTS = 600` coordenadas (≈24 km a 40 m por punto).
+- La suscripción nativa de `expo-location` se guarda a nivel de módulo en `src/core/actions/locations/location.ts`, no dentro de Zustand: es un objeto no serializable y solo debe existir una activa.
+- `src/app/map-simple/index.tsx` conserva un ejemplo estático con dos `Marker` sobre `PROVIDER_GOOGLE`.
+
+## Hooks y estado con Zustand
+
+### Hooks
+
+- `useLocationPermissionAlert`: centraliza títulos, mensajes y acciones de las alertas de permisos; usa `useCallback`.
+- `useTheme` y `useColorScheme`: resuelven la paleta clara/oscura y el valor hidratado en web.
+- Los providers y pantallas usan `useEffect` para consultar permisos, reaccionar a `AppState`, navegar y solicitar la primera ubicación.
+- `CustomMap` usa `useRef<MapView>` para animar la cámara y `useState` para `isFollowingUser` e `isRouterUser`.
+
+### Stores de Zustand
+
+`usePermissionsStore` (`src/presentation/store/usePermissionsStore.ts`):
+
+- `locationsStatus`: estado actual del permiso (empieza en `CHECKING`).
+- `setLocationPermission()`: solicita el permiso y actualiza el estado.
+- `checkLocationPermissionStatus()`: vuelve a consultarlo y actualiza el estado.
+
+`useLocationStore` (`src/presentation/store/useLocationStore.ts`):
+
+- `lastKnownLocation`: última coordenada conocida (`ILatLng | null`).
+- `userLocationList`: historial acotado de coordenadas para la polilínea.
+- `isWatching`: bandera para la UI; el recurso nativo vive fuera del store.
+- `locationError`: mensaje de error para mostrar el botón de reintento.
+- `getLocation()`, `watchLocation()` y `clearWatchLocation()`: acciones del store.
+
+Los componentes leen cada campo con selectores individuales; así, una actualización del GPS no fuerza un re-render del `MapView` por campos del store que no se usan.
 
 ## Estructura principal
 
 ```text
 src/
 ├── app/
-│   ├── _layout.tsx                     # Provider de permisos y navegación
-│   └── permissions/index.tsx           # Pantalla para solicitar el permiso
-├── core/actions/permissions/
-│   └── locations.ts                    # Consulta y normaliza el permiso de ubicación
-├── infrastructure/interface/
-│   └── location.ts                     # Enum PermissionStatus
+│   ├── _layout.tsx                     # Providers, tema y Stack de Expo Router
+│   ├── map/index.tsx                   # Pantalla del mapa con carga/reintento
+│   ├── map-simple/index.tsx            # Ejemplo estático con marcadores
+│   ├── permissions/index.tsx           # Pantalla para solicitar el permiso
+│   └── loading/index.tsx               # Pantalla de carga
+├── core/actions/
+│   ├── locations/location.ts           # get/watch/clear de expo-location
+│   └── permissions/locations.ts        # Adaptador de PermissionStatus
+├── infrastructure/
+│   ├── index.ts
+│   └── interface/
+│       ├── lat-lng.ts                  # ILatLng
+│       └── location.ts                 # Enum PermissionStatus
 └── presentation/
-    ├── hooks/useLocationPermissionAlert.ts
-    ├── providers/PermissionCheckProvider.tsx
-    └── store/usePermissions.ts         # Hook/store de estado de permisos
+    ├── components/
+    │   ├── maps/Custom-Map.tsx          # MapView, Polyline y FABs
+    │   └── shared/                     # FAB, ThemedText, ThemedView, ThemedPressable
+    ├── hooks/
+    │   ├── useLocationPermissionAlert.ts
+    │   ├── use-theme.ts
+    │   └── use-color-scheme.ts
+    ├── providers/
+    │   ├── PermissionCheckProvider.tsx  # Permiso + navegación
+    │   └── LocationWatchProvider.tsx    # Ciclo de vida del watch
+    └── store/
+        ├── usePermissionsStore.ts
+        └── useLocationStore.ts
 ```
 
 ## Ejecutar el proyecto
