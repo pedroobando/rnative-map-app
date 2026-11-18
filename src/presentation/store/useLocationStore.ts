@@ -6,6 +6,17 @@ import {
 import { ILatLng } from '@/infrastructure';
 import { create } from 'zustand';
 
+// Se conservan solo los últimos puntos: sin tope, el array crece sin límite
+// y en cada actualización se copia entero y se reenvía al Polyline nativo.
+// Otras opciones válidas según el producto:
+//   B) ignorar puntos demasiado cerca del anterior (p. ej. < 10 m usando
+//      Haversine) y además aplicar este tope, para quitar el ruido del GPS.
+//   C) persistir el historial completo (AsyncStorage/SQLite) y dibujar solo
+//      una ventana, si se necesita la ruta de toda la sesión.
+// 600 puntos ≈ 24 km con distanceInterval de 40 m: cubre una media maratón
+// (~528 puntos) con margen para oscilaciones del GPS.
+const MAX_POINTS = 600;
+
 interface LocationState {
   lastKnownLocation: ILatLng | null;
   userLocationList: ILatLng[];
@@ -52,7 +63,7 @@ export const useLocationStore = create<LocationState>()((set, get) => ({
         (latlng) => {
           set({
             lastKnownLocation: latlng,
-            userLocationList: [...get().userLocationList, latlng],
+            userLocationList: [...get().userLocationList, latlng].slice(-MAX_POINTS),
           });
         },
         (reason) => console.warn(`watchLocation - ${reason}`),
